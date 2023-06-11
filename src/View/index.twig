@@ -1,0 +1,131 @@
+{% extends "base.twig" %}
+
+{% block app %}
+    <style>
+        #map {
+            height: 400px;
+            width: 100%;
+        }
+
+        .history-section {
+            max-height: 300px;
+            min-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+    <script src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_API_KEY }}&libraries=places"></script>
+
+    <div class="container">
+        <div class="row text-center mt-3">
+            <h1 class="col">Address Input Helper</h1>
+        </div>
+        <div class="row mt-5 mb-5">
+            <div class="col-4">
+                <div class="row">
+                    <div class="col-12">
+                        <label for="autocomplete-input" class="form-label">Address</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="autocomplete-input" placeholder="Enter a location">
+                        </div>
+                    </div>
+                    <div class="col-12 mt-3">
+                        <button onclick="showAndSaveLocation()" class="btn btn-primary">Show & Save</button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-8">
+                <div class="row">
+                    <h3 class="col-12">
+                        Requests history
+                    </h3>
+                    <div class="col-12">
+                        <div class="list-group history-section border">
+                            {% for request in historyRequests %}
+                                <div class="list-group-item">
+                                    <div class="row">
+                                        <div class="col">
+                                            <strong>Address:</strong> {{ request.address }}
+                                        </div>
+                                        <div class="col">
+                                            <strong>Requested at:</strong> {{ request.requestedAt|date('Y-m-d H:i:s') }}
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12">
+                <div id="map"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let map;
+        let autocomplete;
+
+        const initMap = () => {
+            map = new google.maps.Map($('#map').get(0), {
+                center: { lat: 0, lng: 0 },
+                zoom: 8
+            });
+
+            autocomplete = new google.maps.places.Autocomplete(
+                $('#autocomplete-input').get(0)
+            );
+        }
+
+        const showAndSaveLocation = () => {
+            let geocoder = new google.maps.Geocoder();
+            let address = $('#autocomplete-input').val();
+
+            geocoder.geocode({ address: address }, function (results, status) {
+                if (status === google.maps.GeocoderStatus.OK) {
+                    let location = results[0].geometry.location;
+
+                    map.setCenter(location);
+
+                    new google.maps.Marker({
+                        map: map,
+                        position: location
+                    });
+                } else {
+                    alert('Geocode was not successful for the following reason: ' + status);
+                }
+            });
+
+            saveAddress(address)
+        }
+
+        const saveAddress = (address) => {
+            $.ajax({
+                type: "POST",
+                url: '/google/address-activity/create',
+                data: {
+                    address
+                },
+                success: function (data) {
+                    $('.history-section').prepend(
+                        '<div class="list-group-item">' +
+                            '<div class="row">' +
+                                '<div class="col">' +
+                                    '<strong>Address:</strong> ' + data.data.address +
+                                '</div>' +
+                            '<div class="col">' +
+                                '<strong>Requested at:</strong> ' + data.data.requestedAt +
+                            '</div>' +
+                        '</div>' +
+                    '</div>'
+                    )
+                },
+                dataType: 'json'
+            });
+        }
+
+        initMap();
+    </script>
+{% endblock %}
